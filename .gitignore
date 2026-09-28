@@ -1,0 +1,17 @@
+.env
+.env.local
+*.env
+
+target/
+**/target/
+
+node_modules/
+**/node_modules/
+
+dist/
+**/dist/
+
+.idea/
+*.iml
+.vscode/
+*.log

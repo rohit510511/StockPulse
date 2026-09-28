@@ -1,0 +1,271 @@
+### StockPulse — REST API Testing Suite (VS Code REST Client format)
+### Base URL for running local instance on port 8081
+@baseUrl = http://localhost:8081
+
+###############################################################################
+# 1. PRODUCT MANAGEMENT (CRUD & QUERIES)
+###############################################################################
+
+### 1.1 Create Test Product A (Apparel)
+# @name createProductA
+POST {{baseUrl}}/products
+Content-Type: application/json
+
+{
+  "sku": "HTTP-TEST-001",
+  "name": "Classic Oxford Cotton Shirt",
+  "category": "APPAREL",
+  "currentPrice": 45.00,
+  "stockLevel": 20,
+  "reorderThreshold": 10,
+  "demandVelocity": 4.5
+}
+
+### 1.2 Create Test Product B (Electronics - Low Stock)
+# @name createProductB
+POST {{baseUrl}}/products
+Content-Type: application/json
+
+{
+  "sku": "HTTP-TEST-002",
+  "name": "Wireless Noise Cancelling Headphones",
+  "category": "ELECTRONICS",
+  "currentPrice": 129.99,
+  "stockLevel": 4,
+  "reorderThreshold": 12,
+  "demandVelocity": 8.0
+}
+
+### 1.3 ERROR: Duplicate SKU (Expected: 409 Conflict)
+POST {{baseUrl}}/products
+Content-Type: application/json
+
+{
+  "sku": "HTTP-TEST-001",
+  "name": "Duplicate SKU Item",
+  "category": "APPAREL",
+  "currentPrice": 30.00,
+  "stockLevel": 10,
+  "reorderThreshold": 5,
+  "demandVelocity": 1.0
+}
+
+### 1.4 ERROR: Validation Failure (Missing required fields) (Expected: 400 Bad Request)
+POST {{baseUrl}}/products
+Content-Type: application/json
+
+{
+  "sku": "",
+  "currentPrice": -10.00
+}
+
+### 1.5 List All Products (Shows 8 Seeded Products when DB is seeded)
+GET {{baseUrl}}/products
+
+### 1.6 Filter Products by Category (APPAREL)
+GET {{baseUrl}}/products?category=APPAREL
+
+### 1.7 Filter Products by Status (ACTIVE)
+GET {{baseUrl}}/products?status=ACTIVE
+
+### 1.8 Get Product by ID (ID: 1)
+GET {{baseUrl}}/products/1
+
+### 1.9 ERROR: Get Product Not Found (Expected: 404 Not Found)
+GET {{baseUrl}}/products/999999
+
+###############################################################################
+# 2. INVENTORY & ORDERS SIMULATION
+###############################################################################
+
+### 2.1 Update Product Stock Level Directly
+PATCH {{baseUrl}}/products/1/stock
+Content-Type: application/json
+
+{
+  "stockLevel": 18
+}
+
+### 2.2 Simulate Sale / Order (Order 3 units)
+# Should decrement stock by 3 and increase demandVelocity by 5.0
+POST {{baseUrl}}/products/1/orders
+Content-Type: application/json
+
+{
+  "quantity": 3
+}
+
+### 2.3 ERROR: Simulate Sale with Insufficient Stock (Expected: 409 Conflict)
+# Attempting to order 500 units when stock is below 20
+POST {{baseUrl}}/products/1/orders
+Content-Type: application/json
+
+{
+  "quantity": 500
+}
+
+###############################################################################
+# 3. ON-DEMAND SUGGESTIONS (MANUAL TRIGGER)
+###############################################################################
+
+### 3.1 Generate On-Demand Pricing Suggestion for Product 1
+# @name genPricing1
+POST {{baseUrl}}/products/1/suggest-pricing
+
+### 3.2 Generate On-Demand Reorder Suggestion for Product 1
+# @name genReorder1
+POST {{baseUrl}}/products/1/suggest-reorder
+
+### 3.3 Generate On-Demand Pricing Suggestion for Product 2 (Low Stock)
+# @name genPricing2
+POST {{baseUrl}}/products/2/suggest-pricing
+
+### 3.4 Generate On-Demand Reorder Suggestion for Product 2 (Replenish target)
+# @name genReorder2
+POST {{baseUrl}}/products/2/suggest-reorder
+
+###############################################################################
+# 4. VIEW SUGGESTIONS QUEUE
+###############################################################################
+
+### 4.1 Get PENDING Pricing Suggestions
+GET {{baseUrl}}/pricing-suggestions?status=PENDING
+
+### 4.2 Get ALL Pricing Suggestions
+GET {{baseUrl}}/pricing-suggestions
+
+### 4.3 Get PENDING Reorder Suggestions
+GET {{baseUrl}}/reorder-suggestions?status=PENDING
+
+### 4.4 Get ALL Reorder Suggestions
+GET {{baseUrl}}/reorder-suggestions
+
+###############################################################################
+# 5. HUMAN-IN-THE-LOOP APPROVAL WORKFLOW (ACCEPT / REJECT)
+###############################################################################
+
+### 5.1 Accept Pricing Suggestion (ID: 1)
+# Updates Product 1 currentPrice to recommendedPrice
+PATCH {{baseUrl}}/pricing-suggestions/1
+Content-Type: application/json
+
+{
+  "status": "ACCEPTED"
+}
+
+### 5.2 ERROR: Accept Already-Resolved Suggestion (Expected: 409 Conflict)
+PATCH {{baseUrl}}/pricing-suggestions/1
+Content-Type: application/json
+
+{
+  "status": "ACCEPTED"
+}
+
+### 5.3 Reject Pricing Suggestion (ID: 2)
+# Leaves Product currentPrice unchanged
+PATCH {{baseUrl}}/pricing-suggestions/2
+Content-Type: application/json
+
+{
+  "status": "REJECTED"
+}
+
+### 5.4 Accept Reorder Suggestion (ID: 1)
+# Increments Product 1 stockLevel by recommendedQuantity
+PATCH {{baseUrl}}/reorder-suggestions/1
+Content-Type: application/json
+
+{
+  "status": "ACCEPTED"
+}
+
+### 5.5 ERROR: Accept Already-Resolved Reorder Suggestion (Expected: 409 Conflict)
+PATCH {{baseUrl}}/reorder-suggestions/1
+Content-Type: application/json
+
+{
+  "status": "ACCEPTED"
+}
+
+###############################################################################
+# 6. ADMIN STRATEGY CONFIGURATION (RUNTIME SWITCHER)
+###############################################################################
+
+### 6.1 View Active Commerce Strategy (Defaults to AI)
+GET {{baseUrl}}/admin/strategy
+
+### 6.2 Switch Active Commerce Strategy to RULE_BASED
+PUT {{baseUrl}}/admin/strategy
+Content-Type: application/json
+
+{
+  "strategy": "RULE_BASED"
+}
+
+### 6.3 Switch Active Commerce Strategy back to AI
+PUT {{baseUrl}}/admin/strategy
+Content-Type: application/json
+
+{
+  "strategy": "AI"
+}
+
+###############################################################################
+# 7. DEMO SCENARIOS (AI STRATEGY & ASYNC AGENTIC EVENT LOOP)
+###############################################################################
+
+### 7.1 Verify Active Strategy is AI
+GET {{baseUrl}}/admin/strategy
+
+### 7.2 Get Seeded Product PRD-003 (Organic Cotton T-Shirt, stock 8 < threshold 15)
+# In clean seeded DB, PRD-003 is ID 3
+GET {{baseUrl}}/products/3
+
+### 7.3 Simulate Sale on PRD-003 (Triggers INVENTORY_LOW Event Asynchronously)
+# Stock drops from 8 to 6 (< threshold 15), publishing ProductInventoryChangedEvent
+POST {{baseUrl}}/products/3/orders
+Content-Type: application/json
+
+{
+  "quantity": 2
+}
+
+### 7.4 Check Pending Pricing Suggestions (Asynchronous AI Suggestions Appeared)
+# Wait ~1-2 seconds after order 7.3, then run:
+GET {{baseUrl}}/pricing-suggestions?status=PENDING
+
+### 7.5 Check Pending Reorder Suggestions (Asynchronous Replenishment Appeared)
+GET {{baseUrl}}/reorder-suggestions?status=PENDING
+
+### 7.6 Simulate 1st Sale on PRD-008 Hoodie (Hoodie — Heather Grey, stock 11, velocity 15.0)
+# PRD-008 is ID 4. Velocity increases from 15.0 to 20.0 (below 3x category average 21.0)
+POST {{baseUrl}}/products/4/orders
+Content-Type: application/json
+
+{
+  "quantity": 1
+}
+
+### 7.7 Simulate 2nd Sale on PRD-008 Hoodie (Crosses DEMAND_SPIKE threshold!)
+# Velocity increases from 20.0 to 25.0 (> 3x category average 24.0)!
+# Triggers DEMAND_SPIKE event asynchronously!
+POST {{baseUrl}}/products/4/orders
+Content-Type: application/json
+
+{
+  "quantity": 1
+}
+
+### 7.8 View Generated DEMAND_SPIKE Suggestions
+GET {{baseUrl}}/pricing-suggestions?status=PENDING
+
+### 7.9 Accept Generated Suggestion (Approve Pricing Update)
+PATCH {{baseUrl}}/pricing-suggestions/1
+Content-Type: application/json
+
+{
+  "status": "ACCEPTED"
+}
+
+### 7.10 Check Product Price Updated After Approval
+GET {{baseUrl}}/products/3
